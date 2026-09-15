@@ -8,44 +8,40 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 
 app.use('/', createProxyMiddleware({
-    target: 'https://player-nextstudy.ai.studio',
+    target: 'https://pw-player.ai.studio',
     changeOrigin: true,
     secure: false,
-    selfHandleResponse: true,
+    selfHandleResponse: true, // Response modify karne ke liye yeh true hona zaroori hai
     
-    // Request target tak pahunchne se pehle modify karein
     onProxyReq: (proxyReq, req, res) => {
-        // Gzip compression ko disable karne ke liye taaki text easily read ho sake
+        // Target server ko compress data bhejne se rokne ke liye, 
+        // taaki link easily replace ho sake aur app crash na ho
         proxyReq.removeHeader('accept-encoding');
-        
-        // Fake User-Agent set karein taaki target server isko bot na samjhe
-        proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
     },
 
-    // Response user tak aane se pehle intercept karein
     onProxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
-        // CORS allow karein
-        proxyRes.headers['access-control-allow-origin'] = '*';
+        // Kisi bhi domain se access allow karne ke liye
+        proxyRes.headers['Access-Control-Allow-Origin'] = '*';
 
         const contentType = proxyRes.headers['content-type'];
-        
-        // Sirf HTML/JSON/JS files ko hi modify karein
-        if (contentType && (contentType.includes('text/html') || contentType.includes('application/json') || contentType.includes('text/javascript'))) {
+
+        // Sirf text, html ya json files mein hi links replace karein
+        if (contentType && (contentType.includes('text') || contentType.includes('application/json'))) {
             try {
                 let responseString = responseBuffer.toString('utf8');
                 
-                // Telegram links replace karein
+                // t.me/... aur telegram.me/... ko aapke handle se replace karega
                 responseString = responseString.replace(/t\.me\/[a-zA-Z0-9_]+/ig, 't.me/official_marco_22');
                 responseString = responseString.replace(/telegram\.me\/[a-zA-Z0-9_]+/ig, 'telegram.me/official_marco_22');
                 
                 return responseString;
             } catch (err) {
-                console.error('Text replacement error:', err);
-                return responseBuffer; // Error aane par original data bhej de
+                console.error("Replace karne mein error:", err);
+                return responseBuffer;
             }
         }
         
-        // Agar image/video hai toh bina change kiye pass karein
+        // Agar image, video ya koi aur file hai toh bina change kiye aage bhej dein
         return responseBuffer;
     })
 }));
